@@ -76,7 +76,9 @@ file_trace ()
     # Generate temporal files to run simulations in parallel
     for i in $2/*;
     do
+        # echo "#$i"
         trace=$(echo $i | rev | cut -d'/' -f1 | rev)
+        # echo $trace
         if [[ "$LOGGED" == "Y" ]]; then
             echo -n "$1 -warmup_instructions 50000000 -simulation_instructions"
             echo " 200000000 -traces $i > $OUT/$3---$trace 2>>$LOG"
@@ -268,25 +270,48 @@ if [[ "$BUILD" == "Y" ]]; then
         echo "============================================================" >> $LOG
     fi
 
-    echo -n "Building Berti..."
-    cd $BERTI
-    run_compile "./build_champsim.sh hashed_perceptron no vberti no no no no no\
-            lru lru lru srrip drrip lru lru lru 1 no"
-    cd $DIR
+    # echo -n "Building Berti..."
+    # cd $BERTI
+    # run_compile "./build_champsim.sh hashed_perceptron no vberti no no no no no\
+    #         lru lru lru srrip drrip lru lru lru 1 no"
+    # cd $DIR
     
     # Build MLOP, IPCP and IP Stride
     cd $PF
-    echo -n "Building MLOP..."
-    run_compile "./build_champsim.sh hashed_perceptron no mlop_dpc3 no no no no no\
+    # echo -n "Building MLOP..."
+    # run_compile "./build_champsim.sh hashed_perceptron no mlop_dpc3 no no no no no\
+    #         lru lru lru srrip drrip lru lru lru 1 no"
+    # 
+    # echo -n "Building IPCP..."
+    # run_compile "./build_champsim.sh hashed_perceptron no ipcp_isca2020 no no no no\
+    #         no lru lru lru srrip drrip lru lru lru 1 no"
+    # 
+    # echo -n "Building IP Stride..."
+    # run_compile "./build_champsim.sh hashed_perceptron no ip_stride no no no no no\
+    #         lru lru lru srrip drrip lru lru lru 1 no"
+
+    echo -n "Building no-l1i no-l1d prefetcher..."
+    run_compile "./build_champsim.sh hashed_perceptron no no no no no no no\
             lru lru lru srrip drrip lru lru lru 1 no"
-    
-    echo -n "Building IPCP..."
-    run_compile "./build_champsim.sh hashed_perceptron no ipcp_isca2020 no no no no\
-            no lru lru lru srrip drrip lru lru lru 1 no"
-    
-    echo -n "Building IP Stride..."
-    run_compile "./build_champsim.sh hashed_perceptron no ip_stride no no no no no\
+
+    # echo -n "Building Entangling prefetcher..."
+    # run_compile "./build_champsim.sh hashed_perceptron Entangling_2K no no no no no no\
+    #         lru lru lru srrip drrip lru lru lru 1 no"
+
+    echo -n "Building next_line prefetcher..."
+    run_compile "./build_champsim.sh hashed_perceptron next_line no no no no no no\
             lru lru lru srrip drrip lru lru lru 1 no"
+
+    echo -n "Building mana_32KB prefetcher..."
+    run_compile "./build_champsim.sh hashed_perceptron mana_32KB no no no no no no\
+            lru lru lru srrip drrip lru lru lru 1 no" 
+
+    # Todo: 作者仓库给的优化的代码没有办法跑通, 看论文说是用到了最新的Champsim, 但是我看了一下新的Champsim的定义没有定义作者
+    # 写的interface部分, 最关键的是作者两篇论文都说他用了修改过的Champsim, 但是他到底改了啥啊
+    # echo -n "Building Entangling optimized prefetcher..."
+    # run_compile "./build_champsim.sh hashed_perceptron ISCA_Entangling_4Ke_opt no no no no no no\
+    #         lru lru lru srrip drrip lru lru lru 1 no"
+    
 
     if [[ "$FULL" == "Y" ]]; then
         echo -n "Building No Prefetcher..."
@@ -371,27 +396,33 @@ echo -n "Making everything ready to run..."
 
 echo -n "" > tmp_par.out
 
-for i in $(ls $BERTI/bin/*1core*); do
-    if [[ "$LOGGED" == "Y" ]]; then
-        echo "$BERTI/bin/$i" >> $LOG
-        strings -a $BERTI/bin/$i | grep "GCC: " >> $LOG 2>&1
-    fi
-    name=$(echo $i | rev | cut -d/ -f1 | rev)
+# echo do the berti prefetchers
+# 
+# for i in $(ls $BERTI/bin/*1core*); do
+#     echo -e "\n$i"
+#     if [[ "$LOGGED" == "Y" ]]; then
+#         echo "$BERTI/bin/$i" >> $LOG
+#         strings -a $BERTI/bin/$i | grep "GCC: " >> $LOG 2>&1
+#     fi
+#     name=$(echo $i | rev | cut -d/ -f1 | rev)
+# 
+#     OUT=$OUT_BASE/spec2k17
+#     aux=$i
+#     mkdir $OUT > /dev/null 2>&1
+#     file_trace $i $TRACES_SPEC $name >> tmp_par.out
+# 
+#     if [[ "$FULL" == "Y" ]]; then
+#         OUT=$OUT_BASE/gap
+#         mkdir $OUT > /dev/null 2>&1
+#         file_trace $aux $TRACES_GAP $name >> tmp_par.out
+#         OUT=$OUT_BASE/cloudsuite
+#         mkdir $OUT > /dev/null 2>&1
+#         file_trace $aux $TRACES_CS $name >> tmp_par.out
+#     fi
+# done
 
-    OUT=$OUT_BASE/spec2k17
-    aux=$i
-    mkdir $OUT > /dev/null 2>&1
-    file_trace $i $TRACES_SPEC $name >> tmp_par.out
-
-    if [[ "$FULL" == "Y" ]]; then
-        OUT=$OUT_BASE/gap
-        mkdir $OUT > /dev/null 2>&1
-        file_trace $aux $TRACES_GAP $name >> tmp_par.out
-        OUT=$OUT_BASE/cloudsuite
-        mkdir $OUT > /dev/null 2>&1
-        file_trace $aux $TRACES_CS $name >> tmp_par.out
-    fi
-done
+# 这里开始运行entangling prefetcher
+echo -e "\ndo the other prefetchers"
 
 for i in $(ls $PF/bin/*1core*); do
     if [[ "$LOGGED" == "Y" ]]; then
@@ -440,9 +471,9 @@ if [[ "$MULTI" == "Y" ]]; then
     done
     
 fi
-echo " ${GREEN}done${NC}"
+echo "${GREEN}done${NC}"
 
-echo -n "Running..."
+echo "Running..."
 cat tmp_par.out | xargs -I CMD -P $NUM_THREAD bash -c CMD
 echo " ${GREEN}done${NC}"
 
@@ -469,43 +500,50 @@ echo " ${GREEN}done${NC}"
 
 echo "SPEC CPU2K17 Memory Intensive SpeedUp"
 echo "--------------------------------------"
-echo "| Prefetch | Speedup | L1D Accuracy |"
+echo "| L1IPrefetcher | L1DPefetcher | Speedup | L1I Accuracy | L1D Accuracy |"
+
+line_number=0
 while read line; do 
-    speed=$(echo $line | cut -d';' -f3)
-    accur=$(echo $line | cut -d';' -f5)
-    if [[ $(echo $line | cut -d';' -f1) == "vberti" ]]; then
-        echo "| Berti    | $speed%     | $accur%        |"
-    elif [[ $(echo $line | cut -d';' -f1) == "ipcp_isca2020" ]]; then
-        echo "| IPCP     | $speed%     | $accur%        |"
-    elif [[ $(echo $line | cut -d';' -f1) == "mlop_dpc3" ]]; then
-        echo "| MLOP     | $speed%     | $accur%        |"
+    line_number=$((line_number + 1))
+
+    # Skip the first line
+    if [ $line_number -eq 1 ]; then
+        continue
     fi
+    l1i_prefetcher=$(echo $line | cut -d';' -f1)
+    l1d_prefetcher=$(echo $line | cut -d';' -f2)
+    speed=$(echo $line | cut -d';' -f4)
+    l1i_accur=$(echo $line | cut -d';' -f6)
+    lid_accur=$(echo $line | cut -d';' -f9)
+    echo "| $l1i_prefetcher | $l1d_prefetcher | $speed% | $l1i_accur% | $lid_accur% |"
 done < single.csv
+
+cat single.csv > single_mid.csv
 echo "--------------------------------------"
 
-echo -n "Generating Figure 8 SPEC17-MemInt..."
-echo "spec2k17_memint" > single.csv
-if [[ "$VERBOSE" == "Y" ]]; then
-    python3 Python/get_data_fig.py y output/spec2k17 >> single.csv
-elif [[ "$LOGGED" == "Y" ]]; then
-    python3 Python/get_data_fig.py y output/spec2k17 >> single.csv 2>>$LOG
-else
-    python3 Python/get_data_fig.py y output/spec2k17 >> single.csv 2>/dev/null
-fi
-run_command "python3 Python/one_prefetch_performance.py single.csv"
+# echo -n "Generating Figure 8 SPEC17-MemInt..."
+# echo "spec2k17_memint" > single.csv
+# if [[ "$VERBOSE" == "Y" ]]; then
+#     python3 Python/get_data_fig.py y output/spec2k17 >> single.csv
+# elif [[ "$LOGGED" == "Y" ]]; then
+#     python3 Python/get_data_fig.py y output/spec2k17 >> single.csv 2>>$LOG
+# else
+#     python3 Python/get_data_fig.py y output/spec2k17 >> single.csv 2>/dev/null
+# fi
+# run_command "python3 Python/one_prefetch_performance.py single.csv"
 
-echo -n "Generating Figure 9 (a)..."
-if [[ "$VERBOSE" == "Y" ]]; then
-    python3 Python/get_data_by_traces.py y SpeedUp output/spec2k17 > spec.csv
-elif [[ "$LOGGED" == "Y" ]]; then
-    python3 Python/get_data_by_traces.py y SpeedUp output/spec2k17 > spec.csv 2>>$LOG
-else
-    python3 Python/get_data_by_traces.py y SpeedUp output/spec2k17 > spec.csv 2>/dev/null
-fi
-run_command "python3 Python/by_app_performance.py spec.csv cpu"
-
-echo -n "Generating Figure 10 SPEC17-MemInt..."
-run_command "python3 Python/l1d_accuracy.py single.csv"
+# echo -n "Generating Figure 9 (a)..."
+# if [[ "$VERBOSE" == "Y" ]]; then
+#     python3 Python/get_data_by_traces.py y SpeedUp output/spec2k17 > spec.csv
+# elif [[ "$LOGGED" == "Y" ]]; then
+#     python3 Python/get_data_by_traces.py y SpeedUp output/spec2k17 > spec.csv 2>>$LOG
+# else
+#     python3 Python/get_data_by_traces.py y SpeedUp output/spec2k17 > spec.csv 2>/dev/null
+# fi
+# run_command "python3 Python/by_app_performance.py spec.csv cpu"
+# 
+# echo -n "Generating Figure 10 SPEC17-MemInt..."
+# run_command "python3 Python/l1d_accuracy.py single.csv"
 
 if [[ "$FULL" == "Y" ]]; then
 #----------------------------------------------------------------------------#
@@ -750,6 +788,6 @@ if [[ "$MULTI" == "Y" ]]; then
     
     if [[ "$REMOVE_ALL" == "Y" ]]; then
         echo -n "Removing All Files..."
-        run_command "rm -rf output traces gcc7.5 ChampSim/Berti/bin ChampSim/Other_PF/bin"
+        run_command "rm -rf output gcc7.5 ChampSim/Berti/bin ChampSim/Other_PF/bin"
     fi
 fi

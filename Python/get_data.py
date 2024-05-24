@@ -5,6 +5,7 @@ import numpy as np
 import sys
 import statistics as stats
 from pprint import pprint
+import logging
 
 spec2k17_memory_intensive = [
             '602.gcc_s-734B.champsimtrace.xz',
@@ -70,12 +71,14 @@ spec2k17_memory_intensive = [
             'sssp-3.trace.gz',
             'sssp-5.trace.gz',
             'sssp-10.trace.gz',
-            'sssp-14.trace.gz'
+            'sssp-14.trace.gz',
+            # 添加cvp traces
         ]
 only_intensive = False
 
 def add_to_dic(dic, value, i, key):
     # Pre-buscadores
+    
     l1ipref = i.split('-')[1]
     l1dpref = i.split('-')[2]
     l2dpref = i.split('-')[3]
@@ -114,6 +117,8 @@ def add_to_dic(dic, value, i, key):
                 l1dpref = "{}_{}".format(l1dpref, perfect)
             if l1dpref == "vberti_ross_hash":
                 l1dpref = "{}_{}".format(l1dpref, perfect)
+            if l1ipref == "Entangling_2K":
+                l1ipref = "{}_{}".format(l1ipref, perfect)
     
     # Crear estructura
     if l1ipref not in dic:
@@ -125,6 +130,7 @@ def add_to_dic(dic, value, i, key):
     if bench not in dic[l1ipref][l1dpref][l2dpref]:
         dic[l1ipref][l1dpref][l2dpref][bench] = {}
 
+    # logging.warning("Adding to dic: {} {} {} {} {}".format(l1ipref, l1dpref, l2dpref, bench, key))
     dic[l1ipref][l1dpref][l2dpref][bench][key] = value
 
 def get_ipc(fname, dic):
@@ -178,7 +184,7 @@ def get_ipc(fname, dic):
                         #else:
                         #    aux = "no"
                         aux = dic[i][ii][iii][iiii]['ipc'] /\
-                            dic['no']['ip_stride']['no'][iiii]['ipc']
+                            dic['no']['no']['no'][iiii]['ipc']
 
                         dic[i][ii][iii][iiii]['SpeedUp'] = aux
 
@@ -244,6 +250,56 @@ def get_stlb_apki(fname, dic):
 
         add_to_dic(dic, ipc, i, "STLB_APKI")
 
+
+def get_l1iaccuracy(fname, dic):
+    raw = parse.iterateOverDir(fname, "L1I USEFUL LOAD PREFETCHES.*")
+    raw_2 = parse.iterateOverDir(fname, "L1I PREFETCH  REQUESTED.*")
+    raw_3 = parse.iterateOverDir(fname, "L1I TIMELY PREFETCHES.*")
+
+    for i, j, k in zip(raw, raw_2, raw_3):
+        # Simple comprobacion de errores
+        #if (len(raw) < 1):
+        #    print("Error: {}".format(i))
+        #    sys.exit()
+        #for ii in raw[i]:
+        #    if ii == []:
+        #        print("Error: {}".format(i))
+        #        sys.exit()
+
+        time = []
+        late = []
+        for ii, jj, kk in zip(raw[i], raw_2[j], raw_3[k]):
+            for iii, jjj, kkk in zip(ii, jj, kk):
+
+                useful = (int(' '.join(kkk.split()).split('TIMELY PREFETCHES: ')[-1].split(' ')[0]))
+                latepf = (int(' '.join(kkk.split()).split('LATE PREFETCHES: ')[-1].split(' ')[0]))
+                issued = (int(' '.join(jjj.split()).split('USELESS: ')[-1].split(' ')[0]))
+
+                total = useful + latepf + issued
+                logging.warning("{},{},{}".format(useful,latepf, issued))
+
+                if total != 0:
+                    late.append((latepf + useful) / total)
+                    time.append(useful / total)
+                else:
+                    late.append(0)
+                    time.append(0)
+        
+        if time == []:
+            continue
+            
+        if len(time) > 1:
+            # Simulaciones Multicore
+            timepf = np.mean(time)
+            latepf = np.mean(late)
+        else:
+            timepf = time[0]
+            latepf = late[0]
+        if time != time:
+            continue
+        add_to_dic(dic, timepf, i, "L1IAccuracyTime")
+        add_to_dic(dic, latepf, i, "L1IAccuracyLate")
+
 def get_l1daccuracy(fname, dic):
     # Obtener datos
     raw = parse.iterateOverDir(fname, "L1D USEFUL LOAD PREFETCHES.*")
@@ -274,7 +330,9 @@ def get_l1daccuracy(fname, dic):
                 if total != 0:
                     late.append((latepf + useful) / total)
                     time.append(useful / total)
-        
+                else:
+                    late.append(0)
+                    time.append(0)
         if time == []:
             continue
 
@@ -285,9 +343,9 @@ def get_l1daccuracy(fname, dic):
         else:
             timepf = time[0]
             latepf = late[0]
+        # 这里应该是在判断time是不是nan
         if time != time:
             continue
-
         add_to_dic(dic, timepf, i, "L1DAccuracyTime")
         add_to_dic(dic, latepf, i, "L1DAccuracyLate")
 
@@ -338,6 +396,55 @@ def get_l2accuracy(fname, dic):
         add_to_dic(dic, timepf, i, "L2AccuracyTime")
         add_to_dic(dic, latepf, i, "L2AccuracyLate")
 
+
+def get_l1icoverage(fname, dic):
+    raw = parse.iterateOverDir(fname, "L1I TIMELY PREFETCHES:.*")
+    raw_2 = parse.iterateOverDir(fname, "L1I LOAD.*")
+    raw_3 = parse.iterateOverDir(fname, "L1I PREFETCH  ACCESS.*")
+
+    for i, j, k in zip(raw, raw_2, raw_3):
+        # Simple comprobacion de errores
+        #if (len(raw) < 1):
+        #    print("Error: {}".format(i))
+        #    sys.exit()
+        #for ii in raw[i]:
+        #    if ii == []:
+        #        print("Error: {}".format(i))
+        #        sys.exit()
+
+        
+        time = []
+        late = []
+        for ii, jj, kk in zip(raw[i], raw_2[j], raw_3[k]):
+            for iii, jjj, kkk in zip(ii, jj, kk):
+                aux_pf = (int(' '.join(iii.split()).split('TIMELY PREFETCHES: ')[-1].split(' ')[0]))
+                aux_la = (int(' '.join(iii.split()).split('LATE PREFETCHES: ')[-1].split(' ')[0]))
+                aux_mi = (
+                    (int(' '.join(jjj.split()).split('MISS: ')[-1].split(' ')[0]))
+                    +
+                    (int(' '.join(kkk.split()).split('MISS: ')[-1].split(' ')[0]))
+                    )
+
+                if (aux_pf + aux_mi) != 0:
+                    time.append(((aux_pf / (aux_pf + aux_mi))))
+                    late.append((((aux_pf + aux_la) / (aux_pf + aux_mi))))
+        
+        if time == []:
+            continue
+
+        if len(time) > 1:
+            # Simulaciones Multicore
+            time = np.mean(time)
+            late = np.mean(late)
+        else:
+            time = time[0]
+            late = late[0]
+
+        if late != late:
+            continue
+
+        add_to_dic(dic, time, i, "L1ICoverageTime")
+        add_to_dic(dic, late, i, "L1ICoverageLate")
 
 def get_l1dcoverage(fname, dic):
     raw = parse.iterateOverDir(fname, "L1D TIMELY PREFETCHES:.*")
@@ -451,6 +558,36 @@ def get_l2ccoverage(fname, dic):
                             dic['no']['no']['no'][iiii]['L2CLMiss'])
 
                         dic[i][ii][iii][iiii]['L2CCoverageLate'] = aux
+
+def get_l1impki(fname, dic):
+    raw = parse.iterateOverDir(fname, "L1I LOAD      ACCESS.*")
+    raw_2 = parse.iterateOverDir(fname, "L1I PREFETCH  ACCESS.*")
+    raw_3 = parse.iterateOverDir(fname, "CPU [0-9] cumulative IPC:.*")
+
+    for i, j, k in zip(raw, raw_2, raw_3):
+        gmpki = []
+        for ii, jj, kk in zip(raw[i], raw_2[j], raw_3[k]):
+            for iii, jjj, kkk in zip(ii, jj, kk):
+                ldmpki = (int(' '.join(iii.split()).split('MISS: ')[-1].split(' ')[0]))
+                rfmpki = (int(' '.join(jjj.split()).split('MISS: ')[-1].split(' ')[0]))
+                instr  = (int(' '.join(kkk.split()).split('instructions: ')[-1].split(' ')[0]))
+
+                mpki = (ldmpki + rfmpki) / (instr / 1000)
+                gmpki.append(mpki)
+
+        if gmpki == []:
+            continue
+
+        if len(gmpki) > 1:
+            # Simulaciones Multicore
+            gmpki = np.mean(gmpki)
+        else:
+            gmpki = gmpki[0]
+
+        if gmpki != gmpki:
+            continue
+
+        add_to_dic(dic, gmpki, i, "L1IMPKI")
 
 def get_l1dmpki(fname, dic):
     # Obtener datos
@@ -583,32 +720,34 @@ def get_traffic(fname, dic):
 if __name__ == "__main__":
     dic = {}
     base = {}
-    metrics = ["SpeedUp", "L1DAccuracyTime", "L1DAccuracyLate", "L1DMPKI", 
-            "L2CMPKI", "LLCMPKI"]
+    metrics = ["SpeedUp", "L1IAccuracyTime", "L1IAccuracyLate", "L1IMPKI","L1DAccuracyTime", "L1DAccuracyLate", "L1DMPKI", "L2CMPKI", "LLCMPKI"]
 
     if sys.argv[1] == "y":
         # Only memory intensive SPEC2K17
         only_intensive = True
 
     get_ipc(sys.argv[2], dic)
+    get_l1iaccuracy(sys.argv[2], dic)
     get_l1daccuracy(sys.argv[2], dic)
 
     # Print head
-    head = "L1DPref;L2DPref;{}".format(";".join(metrics))
+    head = "L1IPerf;L1DPref;L2DPref;{}".format(";".join(metrics))
     print(head)
 
     # Print all lines
     line = {}
     for i in dic:
         # L1I PF level
+        if i not in line:
+            line[i] = {}
         for ii in dic[i]:
             # L1D PF level
-            if ii not in line:
-                line[ii] = {}
+            if ii not in line[i]:
+                line[i][ii] = {}
             for iii in dic[i][ii]:
                 # L2C PF Level
-                if iii not in line[ii]:
-                    line[ii][iii] = ""
+                if iii not in line[i][ii]:
+                    line[i][ii][iii] = ""
                 for jjjj in metrics:
                     aux = []
                     for iiii in dic[i][ii][iii]:
@@ -618,14 +757,20 @@ if __name__ == "__main__":
                         else:
                             aux.append(0)
                     if jjjj == "SpeedUp":
-                        line[ii][iii] = "{};{:02}".format(line[ii][iii],\
+                        line[i][ii][iii] = "{};{:02}".format(line[i][ii][iii],\
                                 round(scipy.stats.mstats.gmean(aux) * 100 -
                                     100), 1)
                     else:
-                        line[ii][iii] = "{};{:02}".format(line[ii][iii],\
+                        line[i][ii][iii] = "{};{:02}".format(line[i][ii][iii],\
                                 round(np.mean(aux) * 100, 1))
-
 
     for i in sorted(line):
         for ii in sorted(line[i]):
-            print("{};{}{}".format(i, ii, line[i][ii]))
+            for iii in sorted(line[i][ii]):
+                print("{};{};{}{}".format(i, ii, iii, line[i][ii][iii]))
+
+    import json
+    with open('dic.json', 'w') as json_file:
+        json.dump(dic, json_file, indent=4)
+    with open('line.json', 'w') as json_file:
+        json.dump(line, json_file, indent=4)

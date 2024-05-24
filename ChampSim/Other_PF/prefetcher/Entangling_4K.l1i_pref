@@ -412,7 +412,7 @@ uint32_t l1i_get_invalid_timing_cache_entry(uint64_t line_addr) {
   for (uint32_t j = 0; j < L1I_WAY; j++) {
     if (!l1i_timing_cache_table[l1i_cpu_id][i][j].valid) return j;
   }
-  assert(false); // It must return a free entry
+  assert(false); // It must return a free entry, 这里出现了错误
   return L1I_WAY;  
 }
 

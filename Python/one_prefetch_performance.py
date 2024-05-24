@@ -17,6 +17,7 @@ if __name__ == "__main__":
             #'BINGO': [],
             #'PPF': [],
             'Berti': [],
+            'Entangling_2K': []
             }
 
     geo   = {
@@ -26,6 +27,7 @@ if __name__ == "__main__":
             #'BINGO': [],
             #'PPF': [],
             'Berti': [],
+            'Entangling_2K': []
             }
 
     color = {
@@ -33,6 +35,7 @@ if __name__ == "__main__":
             'MLOP': 'whitesmoke',
             'IPCP': 'darkgray',
             'Berti': 'black',
+            'Entangling_2K': 'silver'
             #'IP-Stride': 'silver',
             #'BINGO': 'gainsboro',
             #'PPF': 'snow'
@@ -44,6 +47,7 @@ if __name__ == "__main__":
             #'IP-Stride': '',
             'MLOP': '',
             'Berti': '',
+            'Entangling_2K': ''
             #'PPF': '///',
             #'BINGO': '///' 
             }
@@ -109,6 +113,7 @@ if __name__ == "__main__":
     fig, ax = plt.subplots(figsize=(7,2.5))
     elem = [-.25, 0, .25]
     for i, j in zip(order, elem):
+        print(x + j, order[i])
         ax.bar(x+j, order[i], width=.25, edgecolor='black', zorder=3,
                 color=color[i], hatch=pattern[i], label=i)
         if i in text:

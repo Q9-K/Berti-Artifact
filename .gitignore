@@ -1,0 +1,9 @@
+traces/
+*.json
+*.pdf
+*.csv
+*.out
+output/
+bin
+obj
+__pycache__

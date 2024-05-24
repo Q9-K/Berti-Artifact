@@ -8,7 +8,6 @@ from pprint import pprint
 
 if __name__ == "__main__":
     rc('font', size=13)
-
     color = {
             'IDEAL L1D': 'snow',
             'MLOP': 'whitesmoke',
